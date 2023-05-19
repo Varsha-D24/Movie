@@ -1,0 +1,50 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import pairwise_distances
+
+def movie_recommendation(user_ratings, movie_data, n_recommendations=5):
+    # Create a user-movie rating matrix
+    user_movie_matrix = user_ratings.pivot_table(index='user_id', columns='movie_id', values='rating').fillna(0)
+    
+    # Calculate pairwise similarity between users
+    user_similarity = 1 - pairwise_distances(user_movie_matrix, metric='cosine')
+    
+    # Generate movie recommendations
+    user_index = user_ratings['user_id'].unique().max()  # Assume new user has the highest ID
+    user_index += 1  # Assign a new ID for the new user
+    user_sim_scores = pd.DataFrame(user_similarity[user_index], columns=['similarity'])
+    user_sim_scores['user_id'] = user_sim_scores.index
+    user_sim_scores = user_sim_scores.sort_values(by='similarity', ascending=False)
+    similar_users = user_sim_scores['user_id'].tolist()[1:]  # Exclude the new user itself
+    
+    recommendations = []
+    for user in similar_users:
+        user_movies = user_movie_matrix.loc[user]
+        unrated_movies = user_movies[user_movies == 0].index
+        recommendations.extend(unrated_movies)
+        
+        if len(recommendations) >= n_recommendations:
+            break
+    
+    recommended_movies = movie_data[movie_data['movie_id'].isin(recommendations)]
+    
+    return recommended_movies
+
+def main():
+    # Load movie ratings data
+    ratings_data = pd.read_csv('ratings.csv')
+    
+    # Load movie data (title, genre, etc.)
+    movie_data = pd.read_csv('movies.csv')
+    
+    # Split ratings data into training and testing sets
+    train_data, test_data = train_test_split(ratings_data, test_size=0.2)
+    
+    # Call the movie_recommendation function to get recommendations for a new user
+    new_user_ratings = pd.DataFrame({'user_id': [999], 'movie_id': [1, 2, 3, 4, 5], 'rating': [5, 4, 3, 2, 1]})
+    recommendations = movie_recommendation(new_user_ratings, movie_data)
+    
+    print(recommendations)
+
+if __name__ == '__main__':
+    main()
